@@ -1,0 +1,16 @@
+{
+  "categories": ["特色招牌菜", "凉菜", "热菜", "素菜", "汤类", "主食", "饮品"],
+  "dishes": [
+    { "id": 1, "name": "大盘牛肚", "price": 68, "category": "特色招牌菜", "image": "" },
+    { "id": 2, "name": "脆椒鸡丁", "price": 42, "category": "特色招牌菜", "image": "" },
+    { "id": 3, "name": "大盘牛蹄筋", "price": 68, "category": "特色招牌菜", "image": "" },
+    { "id": 4, "name": "蒜香辣子鸡", "price": 78, "category": "特色招牌菜", "image": "" },
+    { "id": 5, "name": "鲜椒辣子鸡", "price": 78, "category": "特色招牌菜", "image": "" },
+    { "id": 6, "name": "新疆大盘鸡", "price": 78, "category": "特色招牌菜", "image": "" },
+    { "id": 7, "name": "椒麻鱼", "price": 68, "category": "特色招牌菜", "image": "" },
+    { "id": 8, "name": "功夫鱼", "price": 68, "category": "特色招牌菜", "image": "" },
+    { "id": 9, "name": "鲜椒啤酒鱼", "price": 68, "category": "特色招牌菜", "image": "" },
+    { "id": 10, "name": "酸菜鱼", "price": 68, "category": "特色招牌菜", "image": "" },
+    { "id": 11, "name": "麻辣水煮鱼", "price": 68, "category": "特色招牌菜", "image": "" }
+  ]
+}

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>川湘人家 - 扫码点餐</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { background: #f8f8f8; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 70px; }
+
+    /* 顶部店铺信息 */
+    .shop-header { background: linear-gradient(135deg, #d32f2f, #b71c1c); color: white; padding: 20px 16px 16px; position: sticky; top: 0; z-index: 50; }
+    .shop-name { font-size: 20px; font-weight: 700; }
+    .shop-desc { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+
+    /* 分类标签 */
+    .cate-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; background: #fff; border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 49; scrollbar-width: none; }
+    .cate-tabs::-webkit-scrollbar { display: none; }
+    .cate-tab { white-space: nowrap; padding: 6px 16px; border-radius: 20px; font-size: 14px; border: 1px solid #e0e0e0; background: #fff; color: #666; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+    .cate-tab.active { background: #d32f2f; color: #fff; border-color: #d32f2f; font-weight: 600; }
+
+    /* 菜品卡片 */
+    .dish-section { padding: 12px 16px; }
+    .cate-title { font-size: 16px; font-weight: 700; margin: 8px 0 12px; padding-left: 12px; border-left: 4px solid #d32f2f; }
+    .dish-card { display: flex; gap: 12px; background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); align-items: center; }
+    .dish-img { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: #f0f0f0; }
+    .dish-img-placeholder { width: 80px; height: 80px; border-radius: 10px; background: #f5f5f5; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #ddd; font-size: 32px; }
+    .dish-info { flex: 1; min-width: 0; }
+    .dish-name { font-weight: 600; font-size: 15px; color: #333; }
+    .dish-desc { font-size: 12px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dish-price { font-weight: 700; font-size: 18px; color: #d32f2f; margin-top: 4px; }
+    .dish-price::before { content: '¥'; font-size: 12px; }
+    .btn-add { width: 28px; height: 28px; border-radius: 50%; background: #d32f2f; color: #fff; border: none; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .btn-add:active { transform: scale(0.9); }
+    .qty-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .qty-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid #ddd; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #666; }
+    .qty-btn:active { background: #f5f5f5; }
+    .qty-num { font-size: 16px; font-weight: 600; min-width: 20px; text-align: center; }
+
+    /* 底部购物车栏 */
+    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 10px 16px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px; z-index: 100; }
+    .cart-icon-wrap { position: relative; }
+    .cart-icon-btn { width: 48px; height: 48px; border-radius: 50%; background: #333; color: #fff; border: none; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; }
+    .cart-badge { position: absolute; top: -4px; right: -4px; background: #d32f2f; color: #fff; font-size: 11px; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 600; padding: 0 4px; }
+    .cart-summary { flex: 1; }
+    .cart-total { font-size: 18px; font-weight: 700; color: #d32f2f; }
+    .cart-total::before { content: '¥'; font-size: 12px; }
+    .cart-count { font-size: 12px; color: #999; }
+    .btn-checkout { background: linear-gradient(135deg, #d32f2f, #b71c1c); color: #fff; border: none; padding: 10px 24px; border-radius: 25px; font-weight: 600; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+    .btn-checkout:disabled { opacity: 0.5; }
+    .btn-checkout:active { transform: scale(0.96); }
+
+    /* 购物车弹窗 */
+    .cart-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; }
+    .cart-overlay.show { display: block; }
+    .cart-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 16px 16px 0 0; max-height: 55vh; display: flex; flex-direction: column; z-index: 201; transform: translateY(100%); transition: 0.3s; }
+    .cart-panel.show { transform: translateY(0); }
+    .cart-panel-header { padding: 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .cart-panel-body { overflow-y: auto; padding: 8px 16px; flex: 1; }
+    .cart-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .cart-item:last-child { border-bottom: none; }
+    .cart-item-name { flex: 1; font-size: 14px; }
+    .cart-item-price { color: #d32f2f; font-weight: 600; font-size: 14px; min-width: 60px; }
+
+    /* 结算弹窗 */
+    .modal-content { border-radius: 16px; border: none; }
+    .pay-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid #eee; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
+    .pay-option.selected { border-color: #d32f2f; background: #fff5f5; }
+    .pay-option .pay-icon { font-size: 28px; }
+    .pay-option .pay-name { font-weight: 600; font-size: 15px; }
+    .pay-option .pay-desc { font-size: 12px; color: #999; }
+    .pay-option input { display: none; }
+
+    /* 空状态 */
+    .empty-state { text-align: center; padding: 40px 20px; color: #ccc; }
+    .empty-state i { font-size: 48px; }
+    .empty-state p { margin-top: 8px; font-size: 14px; }
+
+    /* 结算成功 */
+    .success-anim { text-align: center; padding: 30px; }
+    .success-anim .check { width: 64px; height: 64px; border-radius: 50%; background: #4caf50; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px; }
+  </style>
+</head>
+<body>
+
+  <!-- 店铺信息 -->
+  <div class="shop-header">
+    <div class="shop-name"><i class="bi bi-shop"></i> 川湘人家</div>
+    <div class="shop-desc">美味川湘菜 · 扫码点餐</div>
+  </div>
+
+  <!-- 分类标签 -->
+  <div class="cate-tabs" id="cateTabs"></div>
+
+  <!-- 菜品列表 -->
+  <div id="dishContainer"></div>
+
+  <!-- 底部购物车栏 -->
+  <div class="cart-bar">
+    <div class="cart-icon-wrap">
+      <button class="cart-icon-btn" onclick="toggleCartPanel()">
+        <i class="bi bi-cart3"></i>
+      </button>
+      <div class="cart-badge" id="cartBadge">0</div>
+    </div>
+    <div class="cart-summary">
+      <div class="cart-total" id="cartTotal">0.00</div>
+      <div class="cart-count" id="cartCount">购物车为空</div>
+    </div>
+    <button class="btn-checkout" id="btnCheckout" onclick="showCheckout()">去结算</button>
+  </div>
+
+  <!-- 购物车弹窗 -->
+  <div class="cart-overlay" id="cartOverlay" onclick="toggleCartPanel()"></div>
+  <div class="cart-panel" id="cartPanel">
+    <div class="cart-panel-header">
+      <span class="fw-bold">已选菜品</span>
+      <button class="btn btn-sm text-danger" onclick="clearCart()">清空</button>
+    </div>
+    <div class="cart-panel-body" id="cartItems"></div>
+  </div>
+
+  <!-- 结算弹窗 -->
+  <div class="modal fade" id="checkoutModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title">确认订单</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="checkoutBody">
+          <!-- 订单详情 -->
+          <div id="orderSummary" class="mb-3"></div>
+          <!-- 支付方式 -->
+          <label class="fw-bold small mb-2">选择支付方式</label>
+          <div class="pay-option selected" onclick="selectPay(this, 'wechat')">
+            <input type="radio" name="payMethod" value="wechat" checked>
+            <div class="pay-icon" style="color:#07c160;"><i class="bi bi-wechat"></i></div>
+            <div>
+              <div class="pay-name">微信支付</div>
+              <div class="pay-desc">推荐使用</div>
+            </div>
+          </div>
+          <div class="pay-option" onclick="selectPay(this, 'alipay')">
+            <input type="radio" name="payMethod" value="alipay">
+            <div class="pay-icon" style="color:#1677ff;"><i class="bi bi-alipay"></i></div>
+            <div>
+              <div class="pay-name">支付宝</div>
+              <div class="pay-desc">支持花呗</div>
+            </div>
+          </div>
+          <button class="btn btn-danger w-100 py-2 mt-3 rounded-pill fw-bold" onclick="submitOrder()">
+            确认支付 ¥<span id="payAmount">0.00</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 成功弹窗 -->
+  <div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body">
+          <div class="success-anim">
+            <div class="check"><i class="bi bi-check-lg"></i></div>
+            <h5 class="fw-bold">支付成功</h5>
+            <p class="text-muted small">订单已提交，请等待上菜</p>
+            <div id="orderNumber" class="text-muted small mb-3"></div>
+            <button class="btn btn-primary rounded-pill px-5" onclick="closeSuccess()">知道了</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ====== 菜单数据 ======
+    // ====== 默认菜单数据（兜底） ======
+    const DEFAULT_MENU = {
+      categories: ["特色招牌菜", "凉菜", "热菜", "素菜", "汤类", "主食", "饮品"],
+      dishes: [
+        { id: 1, name: "大盘牛肚", price: 68, category: "特色招牌菜", image: "" },
+        { id: 2, name: "脆椒鸡丁", price: 42, category: "特色招牌菜", image: "" },
+        { id: 3, name: "大盘牛蹄筋", price: 68, category: "特色招牌菜", image: "" },
+        { id: 4, name: "蒜香辣子鸡", price: 78, category: "特色招牌菜", image: "" },
+        { id: 5, name: "鲜椒辣子鸡", price: 78, category: "特色招牌菜", image: "" },
+        { id: 6, name: "新疆大盘鸡", price: 78, category: "特色招牌菜", image: "" },
+        { id: 7, name: "椒麻鱼", price: 68, category: "特色招牌菜", image: "" },
+        { id: 8, name: "功夫鱼", price: 68, category: "特色招牌菜", image: "" },
+        { id: 9, name: "鲜椒啤酒鱼", price: 68, category: "特色招牌菜", image: "" },
+        { id: 10, name: "酸菜鱼", price: 68, category: "特色招牌菜", image: "" },
+        { id: 11, name: "麻辣水煮鱼", price: 68, category: "特色招牌菜", image: "" }
+      ]
+    };
+
+    let MENU = { ...DEFAULT_MENU, dishes: [...DEFAULT_MENU.dishes] };
+
+    // ====== 购物车 ======
+    let cart = {};
+    let checkoutModal, successModal;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      checkoutModal = new bootstrap.Modal(document.getElementById('checkoutModal'));
+      successModal = new bootstrap.Modal(document.getElementById('successModal'));
+      renderCategories();
+      renderDishes();
+      updateCart();
+
+      // 从外部 JSON 加载最新菜单数据
+      fetch('menu-data.json')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.dishes && data.dishes.length > 0) {
+            MENU = data;
+            renderCategories();
+            renderDishes();
+            updateCart();
+          }
+        })
+        .catch(() => { /* 使用默认数据 */ });
+    });
+
+    // ====== 渲染分类标签 ======
+    function renderCategories() {
+      const container = document.getElementById('cateTabs');
+      container.innerHTML = MENU.categories.filter(c => MENU.dishes.some(d => d.category === c)).map(c =>
+        `<div class="cate-tab active" onclick="scrollToCate('${c}')">${c}</div>`
+      ).join('');
+    }
+
+    function scrollToCate(cate) {
+      const el = document.getElementById('cate-' + cate);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ====== 渲染菜品 ======
+    function renderDishes() {
+      const container = document.getElementById('dishContainer');
+      const groups = {};
+      MENU.dishes.forEach(d => {
+        if (!groups[d.category]) groups[d.category] = [];
+        groups[d.category].push(d);
+      });
+
+      let html = '';
+      const cateOrder = MENU.categories.filter(c => groups[c]);
+      cateOrder.forEach(cate => {
+        html += `<div class="dish-section" id="cate-${cate}">`;
+        html += `<div class="cate-title">${cate}</div>`;
+        groups[cate].forEach(d => {
+          const imgHtml = d.image
+            ? `<img src="${d.image}" class="dish-img" alt="${d.name}">`
+            : `<div class="dish-img-placeholder"><i class="bi bi-image"></i></div>`;
+          const qty = cart[d.id] || 0;
+          html += `
+            <div class="dish-card" data-id="${d.id}">
+              ${imgHtml}
+              <div class="dish-info">
+                <div class="dish-name">${d.name}</div>
+                <div class="dish-desc">川湘风味 · 精选食材</div>
+                <div class="dish-price">${d.price}</div>
+              </div>
+              <div id="qty_${d.id}">
+                ${qty > 0 ? `
+                  <div class="qty-control">
+                    <button class="qty-btn" onclick="changeQty(${d.id}, -1)">−</button>
+                    <span class="qty-num">${qty}</span>
+                    <button class="qty-btn" onclick="changeQty(${d.id}, 1)">+</button>
+                  </div>
+                ` : `
+                  <button class="btn-add" onclick="changeQty(${d.id}, 1)">+</button>
+                `}
+              </div>
+            </div>`;
+        });
+        html += `</div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    // ====== 购物车逻辑 ======
+    function changeQty(id, delta) {
+      const d = MENU.dishes.find(x => x.id === id);
+      if (!d) return;
+      const old = cart[id] || 0;
+      const next = old + delta;
+      if (next <= 0) {
+        delete cart[id];
+      } else {
+        cart[id] = next;
+      }
+      updateCart();
+      // 更新按钮
+      const qtyEl = document.getElementById('qty_' + id);
+      const qty = cart[id] || 0;
+      if (qty > 0) {
+        qtyEl.innerHTML = `
+          <div class="qty-control">
+            <button class="qty-btn" onclick="changeQty(${id}, -1)">−</button>
+            <span class="qty-num">${qty}</span>
+            <button class="qty-btn" onclick="changeQty(${id}, 1)">+</button>
+          </div>`;
+      } else {
+        qtyEl.innerHTML = `<button class="btn-add" onclick="changeQty(${id}, 1)">+</button>`;
+      }
+    }
+
+    function updateCart() {
+      const items = Object.entries(cart);
+      const totalCount = items.reduce((s, [, q]) => s + q, 0);
+      const totalPrice = items.reduce((s, [id, q]) => {
+        const d = MENU.dishes.find(x => x.id == id);
+        return s + (d ? d.price * q : 0);
+      }, 0);
+
+      document.getElementById('cartBadge').textContent = totalCount;
+      document.getElementById('cartBadge').style.display = totalCount > 0 ? 'flex' : 'none';
+      document.getElementById('cartTotal').textContent = totalPrice.toFixed(2);
+      document.getElementById('cartCount').textContent = totalCount > 0 ? `共 ${totalCount} 件` : '购物车为空';
+      document.getElementById('btnCheckout').disabled = totalCount === 0;
+
+      // 更新购物车面板
+      renderCartPanel();
+    }
+
+    function renderCartPanel() {
+      const container = document.getElementById('cartItems');
+      const items = Object.entries(cart);
+      if (items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="bi bi-cart"></i><p>购物车空空如也</p></div>';
+        return;
+      }
+      container.innerHTML = items.map(([id, qty]) => {
+        const d = MENU.dishes.find(x => x.id == id);
+        if (!d) return '';
+        return `
+          <div class="cart-item">
+            <div class="cart-item-name">${d.name}</div>
+            <div class="qty-control">
+              <button class="qty-btn" onclick="changeQty(${id}, -1)">−</button>
+              <span class="qty-num">${qty}</span>
+              <button class="qty-btn" onclick="changeQty(${id}, 1)">+</button>
+            </div>
+            <div class="cart-item-price">¥${(d.price * qty).toFixed(2)}</div>
+          </div>`;
+      }).join('');
+    }
+
+    function toggleCartPanel() {
+      const overlay = document.getElementById('cartOverlay');
+      const panel = document.getElementById('cartPanel');
+      const show = !overlay.classList.contains('show');
+      overlay.classList.toggle('show', show);
+      panel.classList.toggle('show', show);
+      if (show) renderCartPanel();
+    }
+
+    function clearCart() {
+      if (Object.keys(cart).length === 0) return;
+      cart = {};
+      updateCart();
+      renderDishes();
+      toggleCartPanel();
+    }
+
+    // ====== 结算 ======
+    function showCheckout() {
+      const items = Object.entries(cart);
+      if (items.length === 0) return;
+      const totalPrice = items.reduce((s, [id, q]) => {
+        const d = MENU.dishes.find(x => x.id == id);
+        return s + (d ? d.price * q : 0);
+      }, 0);
+
+      let summaryHtml = '<div class="small"><table class="table table-sm table-borderless mb-0">';
+      items.forEach(([id, qty]) => {
+        const d = MENU.dishes.find(x => x.id == id);
+        if (d) summaryHtml += `<tr><td>${d.name} × ${qty}</td><td class="text-end">¥${(d.price * qty).toFixed(2)}</td></tr>`;
+      });
+      summaryHtml += `<tr class="fw-bold"><td>合计</td><td class="text-end text-danger">¥${totalPrice.toFixed(2)}</td></tr>`;
+      summaryHtml += '</table></div>';
+      document.getElementById('orderSummary').innerHTML = summaryHtml;
+      document.getElementById('payAmount').textContent = totalPrice.toFixed(2);
+      checkoutModal.show();
+    }
+
+    function selectPay(el, method) {
+      document.querySelectorAll('.pay-option').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      el.querySelector('input').checked = true;
+    }
+
+    function submitOrder() {
+      const method = document.querySelector('input[name="payMethod"]:checked')?.value || 'wechat';
+      const orderNum = 'CZ' + Date.now().toString(36).toUpperCase();
+      document.getElementById('orderNumber').textContent = '订单号：' + orderNum;
+      checkoutModal.hide();
+      setTimeout(() => successModal.show(), 300);
+    }
+
+    function closeSuccess() {
+      successModal.hide();
+      cart = {};
+      updateCart();
+      renderDishes();
+    }
+  </script>
+</body>
+</html>

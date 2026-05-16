@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>菜品管理</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  <style>
+    body { background: #f5f5f5; padding-bottom: 80px; }
+    .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 16px; position: sticky; top: 0; z-index: 100; }
+    .dish-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
+    .dish-img-placeholder { width: 60px; height: 60px; border-radius: 8px; background: #eee; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 24px; }
+    .category-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; background: #e8f4fd; color: #1976d2; }
+    .price-tag { font-weight: bold; color: #e53935; font-size: 16px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+    .empty-state i { font-size: 64px; display: block; margin-bottom: 16px; }
+    .modal-img-preview { max-width: 100%; max-height: 200px; border-radius: 8px; }
+    .toast-container { position: fixed; top: 60px; right: 16px; z-index: 9999; }
+    .category-header { background: #fff; padding: 8px 16px; margin: 16px 0 8px; border-radius: 8px; font-weight: bold; border-left: 4px solid #667eea; }
+    .dish-card { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px; }
+    .dish-info { flex: 1; min-width: 0; }
+    .dish-name { font-weight: 600; font-size: 15px; }
+    .dish-actions { display: flex; gap: 4px; }
+    .btn-icon { width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: transparent; }
+    .btn-icon:hover { background: #f0f0f0; }
+    .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; gap: 8px; z-index: 100; }
+    .bottom-bar .btn { flex: 1; border-radius: 25px; }
+    .search-bar { margin: 12px 16px; }
+    .count-badge { font-size: 12px; color: #999; margin-left: 8px; }
+    .image-upload-area { border: 2px dashed #ddd; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; }
+    .image-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+    .image-upload-area.has-image { border-color: #4caf50; }
+    .image-upload-area img { max-height: 150px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部导航 -->
+  <div class="header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0"><i class="bi bi-journal"></i> 菜品管理</h5>
+    <span class="badge bg-light text-dark" id="totalCount">0 道菜</span>
+  </div>
+
+  <!-- 搜索栏 -->
+  <div class="search-bar">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+      <input type="text" class="form-control" id="searchInput" placeholder="搜索菜品..." oninput="renderList()">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" id="filterBtn">
+        全部分类
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" id="filterDropdown">
+        <li><a class="dropdown-item active" data-cate="" href="#">全部分类</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 菜品列表 -->
+  <div id="dishList" class="px-3"></div>
+
+  <!-- 底部操作栏 -->
+  <div class="bottom-bar">
+    <button class="btn btn-outline-primary" onclick="exportData()">
+      <i class="bi bi-download"></i> 导出
+    </button>
+    <button class="btn btn-primary" onclick="openAddModal()">
+      <i class="bi bi-plus-lg"></i> 添加
+    </button>
+    <button class="btn btn-success" onclick="publishToSite()">
+      <i class="bi bi-cloud-upload"></i> 发布
+    </button>
+    <button class="btn btn-outline-danger" onclick="clearAll()">
+      <i class="bi bi-trash"></i>
+    </button>
+  </div>
+
+  <!-- 添加/编辑弹窗 -->
+  <div class="modal fade" id="dishModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title" id="modalTitle">添加菜品</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="dishForm">
+            <div class="mb-3">
+              <label class="form-label small">菜名 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="dishName" required placeholder="例：宫保鸡丁">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">价格 (元) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="dishPrice" required min="0" step="0.01" placeholder="例：42">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">分类 <span class="text-danger">*</span></label>
+              <div class="d-flex gap-2">
+                <input type="text" class="form-control" id="dishCategory" list="categoryList" required placeholder="例：热菜">
+                <button type="button" class="btn btn-outline-secondary" onclick="showCategoryManage()" title="管理分类">
+                  <i class="bi bi-gear"></i>
+                </button>
+              </div>
+              <datalist id="categoryList"></datalist>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">菜品图片</label>
+              <div class="image-upload-area" id="imageUploadArea">
+                <div id="uploadPlaceholder">
+                  <i class="bi bi-camera" style="font-size: 32px; color: #ccc;"></i>
+                  <p class="mb-0 mt-2 small text-muted">点击上传 或 Ctrl+V 粘贴</p>
+                </div>
+                <img id="imagePreview" class="d-none" alt="预览">
+                <button type="button" class="btn btn-sm btn-outline-danger mt-2 d-none" id="removeImageBtn" onclick="removeImage()">
+                  <i class="bi bi-x"></i> 移除图片
+                </button>
+              </div>
+              <input type="file" class="d-none" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+              <input type="hidden" id="dishImage">
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button class="btn btn-primary" onclick="saveDish()"><i class="bi bi-check-lg"></i> 保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- 分类管理弹窗 -->
+  <div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title">管理分类</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="input-group mb-3">
+            <input type="text" class="form-control" id="newCategoryInput" placeholder="输入新分类名称">
+            <button class="btn btn-primary" onclick="addCategory()">添加</button>
+          </div>
+          <div id="categoryListManage"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ====== 数据管理 ======
+    let dishes = JSON.parse(localStorage.getItem('menuDishes') || '[]');
+    let categories = JSON.parse(localStorage.getItem('menuCategories') || '["凉菜","热菜","素菜","汤类","主食","饮品"]');
+    let editingId = null;
+    let dishModal = null;
+    let categoryModal = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      dishModal = new bootstrap.Modal(document.getElementById('dishModal'));
+      categoryModal = new bootstrap.Modal(document.getElementById('categoryModal'));
+      renderList();
+      updateCategoryFilter();
+      updateCategoryDatalist();
+    });
+
+    // ====== 数据持久化 ======
+    function saveData() {
+      localStorage.setItem('menuDishes', JSON.stringify(dishes));
+      localStorage.setItem('menuCategories', JSON.stringify(categories));
+    }
+
+    // ====== 渲染列表 ======
+    function renderList() {
+      const container = document.getElementById('dishList');
+      const search = document.getElementById('searchInput').value.trim().toLowerCase();
+      const filterCate = document.getElementById('filterBtn').dataset.cate || '';
+
+      let filtered = dishes.filter(d => {
+        if (filterCate && d.category !== filterCate) return false;
+        if (search && !d.name.toLowerCase().includes(search) && !d.category.toLowerCase().includes(search)) return false;
+        return true;
+      });
+
+      document.getElementById('totalCount').textContent = filtered.length + ' 道菜';
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>${dishes.length === 0 ? '还没有菜品，点击底部添加' : '没有匹配的菜品'}</p>
+          </div>`;
+        return;
+      }
+
+      // 按分类分组
+      const groups = {};
+      filtered.forEach(d => {
+        if (!groups[d.category]) groups[d.category] = [];
+        groups[d.category].push(d);
+      });
+
+      let html = '';
+      const cateOrder = categories.filter(c => groups[c]);
+      const otherCates = Object.keys(groups).filter(c => !categories.includes(c));
+      [...cateOrder, ...otherCates].forEach(cate => {
+        const items = groups[cate];
+        html += `<div class="category-header">${cate} <span class="count-badge">${items.length}</span></div>`;
+        items.forEach(d => {
+          const imgHtml = d.image
+            ? `<img src="${d.image}" class="dish-img" alt="${d.name}">`
+            : `<div class="dish-img-placeholder"><i class="bi bi-image"></i></div>`;
+          html += `
+            <div class="dish-card">
+              ${imgHtml}
+              <div class="dish-info">
+                <div class="dish-name">${d.name}</div>
+                <div>
+                  <span class="price-tag">¥${parseFloat(d.price).toFixed(2)}</span>
+                  <span class="category-tag ms-1">${d.category}</span>
+                </div>
+              </div>
+              <div class="dish-actions">
+                <button class="btn-icon" onclick="editDish('${d.id}')" title="编辑">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn-icon text-danger" onclick="deleteDish('${d.id}')" title="删除">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </div>`;
+        });
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ====== 分类筛选更新 ======
+    function updateCategoryFilter() {
+      const menu = document.getElementById('filterDropdown');
+      menu.innerHTML = '<li><a class="dropdown-item active" data-cate="" href="#">全部分类</a></li>';
+      categories.forEach(c => {
+        const count = dishes.filter(d => d.category === c).length;
+        menu.innerHTML += `<li><a class="dropdown-item" data-cate="${c}" href="#">${c} (${count})</a></li>`;
+      });
+      menu.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+          e.preventDefault();
+          menu.querySelectorAll('.dropdown-item').forEach(x => x.classList.remove('active'));
+          this.classList.add('active');
+          document.getElementById('filterBtn').textContent = this.dataset.cate || '全部分类';
+          document.getElementById('filterBtn').dataset.cate = this.dataset.cate;
+          renderList();
+        });
+      });
+    }
+
+    function updateCategoryDatalist() {
+      const dl = document.getElementById('categoryList');
+      dl.innerHTML = categories.map(c => `<option value="${c}">`).join('');
+    }
+
+    // ====== 添加/编辑弹窗 ======
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = '添加菜品';
+      document.getElementById('dishForm').reset();
+      document.getElementById('dishImage').value = '';
+      document.getElementById('imagePreview').classList.add('d-none');
+      document.getElementById('uploadPlaceholder').classList.remove('d-none');
+      document.getElementById('imageUploadArea').classList.remove('has-image');
+      dishModal.show();
+    }
+
+    function editDish(id) {
+      const d = dishes.find(x => x.id === id);
+      if (!d) return;
+      editingId = id;
+      document.getElementById('modalTitle').textContent = '编辑菜品';
+      document.getElementById('dishName').value = d.name;
+      document.getElementById('dishPrice').value = d.price;
+      document.getElementById('dishCategory').value = d.category;
+      document.getElementById('dishImage').value = d.image || '';
+      if (d.image) {
+        document.getElementById('imagePreview').src = d.image;
+        document.getElementById('imagePreview').classList.remove('d-none');
+        document.getElementById('uploadPlaceholder').classList.add('d-none');
+        document.getElementById('imageUploadArea').classList.add('has-image');
+      }
+      dishModal.show();
+    }
+
+    // ====== 图片处理（上传 + 粘贴） ======
+    document.addEventListener('DOMContentLoaded', function() {
+      const area = document.getElementById('imageUploadArea');
+      area.addEventListener('click', () => document.getElementById('imageInput').click());
+      area.addEventListener('paste', function(e) {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) loadImageFile(file);
+            return;
+          }
+        }
+      });
+      // 全局粘贴支持（当焦点在弹窗内时）
+      document.getElementById('dishModal').addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+          // Let the paste event on the area handle it
+        }
+      });
+    });
+
+    function loadImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const dataUrl = ev.target.result;
+        document.getElementById('dishImage').value = dataUrl;
+        document.getElementById('imagePreview').src = dataUrl;
+        document.getElementById('imagePreview').classList.remove('d-none');
+        document.getElementById('removeImageBtn').classList.remove('d-none');
+        document.getElementById('uploadPlaceholder').classList.add('d-none');
+        document.getElementById('imageUploadArea').classList.add('has-image');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      loadImageFile(file);
+    }
+
+    function removeImage() {
+      document.getElementById('dishImage').value = '';
+      document.getElementById('imagePreview').src = '';
+      document.getElementById('imagePreview').classList.add('d-none');
+      document.getElementById('removeImageBtn').classList.add('d-none');
+      document.getElementById('uploadPlaceholder').classList.remove('d-none');
+      document.getElementById('imageUploadArea').classList.remove('has-image');
+      document.getElementById('imageInput').value = '';
+    }
+
+    // ====== 保存 ======
+    function saveDish() {
+      const name = document.getElementById('dishName').value.trim();
+      const price = document.getElementById('dishPrice').value;
+      const category = document.getElementById('dishCategory').value.trim();
+      const image = document.getElementById('dishImage').value;
+
+      if (!name) { showToast('请输入菜名', 'danger'); return; }
+      if (!price || isNaN(price) || parseFloat(price) <= 0) { showToast('请输入有效价格', 'danger'); return; }
+      if (!category) { showToast('请输入分类', 'danger'); return; }
+
+      if (editingId) {
+        const idx = dishes.findIndex(d => d.id === editingId);
+        if (idx !== -1) {
+          dishes[idx] = { ...dishes[idx], name, price: parseFloat(price), category, image };
+        }
+        showToast('已更新');
+      } else {
+        dishes.push({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          name,
+          price: parseFloat(price),
+          category,
+          image
+        });
+        // 添加新分类
+        if (!categories.includes(category)) {
+          categories.push(category);
+          updateCategoryFilter();
+          updateCategoryDatalist();
+        }
+        showToast('已添加');
+      }
+
+      saveData();
+      renderList();
+      updateCategoryFilter();
+      dishModal.hide();
+    }
+
+    // ====== 删除 ======
+    function deleteDish(id) {
+      if (!confirm('确定要删除这道菜吗？')) return;
+      dishes = dishes.filter(d => d.id !== id);
+      saveData();
+      renderList();
+      updateCategoryFilter();
+      showToast('已删除');
+    }
+
+    function clearAll() {
+      if (dishes.length === 0) return;
+      if (!confirm('确定要删除所有菜品吗？此操作不可撤销！')) return;
+      dishes = [];
+      saveData();
+      renderList();
+      updateCategoryFilter();
+      showToast('已清空所有菜品');
+    }
+
+    // ====== 分类管理 ======
+    function showCategoryManage() {
+      renderCategoryManage();
+      categoryModal.show();
+    }
+
+    function renderCategoryManage() {
+      const container = document.getElementById('categoryListManage');
+      if (categories.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">暂无分类</p>';
+        return;
+      }
+      container.innerHTML = categories.map(c => {
+        const count = dishes.filter(d => d.category === c).length;
+        return `
+          <div class="d-flex align-items-center justify-content-between p-2 border-bottom">
+            <span>${c} <span class="text-muted small">(${count}道菜)</span></span>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeCategory('${c}')">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>`;
+      }).join('');
+    }
+
+    function addCategory() {
+      const input = document.getElementById('newCategoryInput');
+      const name = input.value.trim();
+      if (!name) { showToast('请输入分类名称', 'danger'); return; }
+      if (categories.includes(name)) { showToast('分类已存在', 'warning'); return; }
+      categories.push(name);
+      saveData();
+      updateCategoryFilter();
+      updateCategoryDatalist();
+      renderCategoryManage();
+      input.value = '';
+      showToast('已添加分类');
+    }
+
+    function removeCategory(cate) {
+      const count = dishes.filter(d => d.category === cate).length;
+      if (count > 0) {
+        if (!confirm(`分类"${cate}"下有 ${count} 道菜，确定要删除这个分类吗？（菜品不会删除）`)) return;
+      } else {
+        if (!confirm(`确定要删除分类"${cate}"吗？`)) return;
+      }
+      categories = categories.filter(c => c !== cate);
+      saveData();
+      updateCategoryFilter();
+      updateCategoryDatalist();
+      renderCategoryManage();
+      renderList();
+      showToast('已删除分类');
+    }
+
+    // ====== 导出数据 ======
+    function exportData() {
+      if (dishes.length === 0) {
+        showToast('还没有菜品数据', 'warning');
+        return;
+      }
+      // 按分类排序
+      const sorted = [...dishes].sort((a, b) => {
+        const ai = categories.indexOf(a.category);
+        const bi = categories.indexOf(b.category);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+      const data = {
+        restaurant: '川湘人家',
+        exportTime: new Date().toLocaleString(),
+        categories,
+        dishes: sorted.map(d => ({
+          name: d.name,
+          price: d.price,
+          category: d.category,
+          hasImage: !!d.image
+        }))
+      };
+      // 复制到剪贴板
+      const json = JSON.stringify(data, null, 2);
+      navigator.clipboard.writeText(json).then(() => {
+        showToast('数据已复制到剪贴板');
+      }).catch(() => {
+        // 降级：下载文件
+        const blob = new Blob([json], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'menu_data.json';
+        a.click();
+        showToast('数据已导出');
+      });
+    }
+
+    // ====== 发布到网站 ======
+    function publishToSite() {
+      if (dishes.length === 0) {
+        showToast('还没有菜品，先添加吧', 'warning');
+        return;
+      }
+      const data = {
+        categories: categories,
+        dishes: dishes.map(d => ({
+          id: d.id,
+          name: d.name,
+          price: d.price,
+          category: d.category,
+          image: d.image || ''
+        }))
+      };
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'menu-data.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('menu-data.json 已下载，请上传到 GitHub');
+    }
+
+    // ====== Toast ======
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const icons = { success: 'bi-check-circle-fill', danger: 'bi-exclamation-circle-fill', warning: 'bi-exclamation-triangle-fill' };
+      const html = `
+        <div class="toast align-items-center text-bg-${type} border-0 show" role="alert">
+          <div class="d-flex">
+            <div class="toast-body"><i class="bi ${icons[type] || icons.success} me-1"></i> ${msg}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+          </div>
+        </div>`;
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      container.appendChild(div);
+      setTimeout(() => { div.remove(); }, 2000);
+    }
+  </script>
+</body>
+</html>
